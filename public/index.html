@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Descargar videos</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --fg:#f2f3f5; --muted:#8b92a0; --accent:#4f8cff; --line:#272b35; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f5f6f8; --card:#fff; --fg:#14161a; --muted:#6b7280; --line:#e3e5ea; } }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; display:grid; place-items:start center; padding:48px 16px; }
+  main { width:100%; max-width:560px; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  form { display:flex; gap:8px; }
+  input { flex:1; min-width:0; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--fg); font:inherit; }
+  button, a.btn { padding:12px 18px; border-radius:10px; border:0; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; text-align:center; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .card { margin-top:20px; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .card img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; }
+  .meta { padding:16px; }
+  .meta h2 { font-size:1rem; margin:0 0 2px; }
+  .meta small { color:var(--muted); }
+  .list { display:grid; gap:8px; padding:0 16px 16px; }
+  .list a.btn { display:flex; justify-content:space-between; }
+  .list a.alt { background:transparent; color:var(--fg); border:1px solid var(--line); }
+  .err { margin-top:16px; color:#ff6b6b; }
+  footer { margin-top:28px; color:var(--muted); font-size:.8rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Descargar videos</h1>
+  <p class="sub">YouTube, X, Instagram y Facebook. Pega el enlace.</p>
+  <form id="f">
+    <input id="u" type="url" placeholder="https://..." required autofocus>
+    <button id="b">Buscar</button>
+  </form>
+  <div id="out"></div>
+  <footer>Úsalo solo con contenido tuyo o que tengas permiso de descargar.</footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmtSize = (n) => n ? (n / 1048576).toFixed(n > 1e9 ? 0 : 1) + " MB" : "";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const url = $("u").value.trim();
+  $("b").disabled = true; $("b").textContent = "Buscando…"; $("out").innerHTML = "";
+  try {
+    const r = await fetch("/api/info?url=" + encodeURIComponent(url));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "Error");
+    const link = (f, i) => {
+      const href = `/api/download?url=${encodeURIComponent(url)}&format_id=${encodeURIComponent(f.id)}`;
+      const name = f.kind === "audio" ? "Solo audio" : f.label + (i === 0 ? " · calidad original" : "");
+      return `<a class="btn ${i === 0 ? "" : "alt"}" href="${href}"><span>${esc(name)} · ${esc(f.ext)}</span><span>${fmtSize(f.size)}</span></a>`;
+    };
+    $("out").innerHTML = `<div class="card">
+      ${d.thumbnail ? `<img src="${esc(d.thumbnail)}" alt="" referrerpolicy="no-referrer">` : ""}
+      <div class="meta"><h2>${esc(d.title)}</h2><small>${esc(d.uploader)}</small></div>
+      <div class="list">${d.formats.map(link).join("")}</div></div>`;
+  } catch (err) {
+    $("out").innerHTML = `<p class="err">${esc(err.message)}</p>`;
+  } finally {
+    $("b").disabled = false; $("b").textContent = "Buscar";
+  }
+});
+</script>
+</body>
+</html>
